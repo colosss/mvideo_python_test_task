@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from src.application.dto.logs import CreateDTO
+from src.application.dto.logs import CreateLogDTO
 from src.application.log_parser import parse_http_log_line
 from src.core.domain.models import HttpLogRecord, HttpLogStats, LogFilters
 from src.core.repositories import AbstractHttpLogRepositories
@@ -11,7 +11,7 @@ class CreateHttpLogUseCase:
     
     async def execute(
             self,
-            dto: CreateDTO,
+            dto: CreateLogDTO,
     )->HttpLogRecord:
         parsed_log=parse_http_log_line(dto.log)
         return await self._logs.create(parsed_log)
