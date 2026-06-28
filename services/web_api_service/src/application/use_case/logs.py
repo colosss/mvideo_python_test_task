@@ -3,10 +3,10 @@ from typing import Sequence
 from src.application.dto.logs import CreateLogDTO
 from src.application.log_parser import parse_http_log_line
 from src.core.domain.models import HttpLogRecord, HttpLogStats, LogFilters
-from src.core.repositories import AbstractHttpLogRepositories
+from src.core.repositories import AbstractHttpLogRepository
 
 class CreateHttpLogUseCase:
-    def __init__(self, logs: AbstractHttpLogRepositories)->None:
+    def __init__(self, logs: AbstractHttpLogRepository)->None:
         self._logs=logs
     
     async def execute(
@@ -17,7 +17,7 @@ class CreateHttpLogUseCase:
         return await self._logs.create(parsed_log)
     
 class ListHttpLogsUseCase:
-    def __init__(self, logs: AbstractHttpLogRepositories)->None:
+    def __init__(self, logs: AbstractHttpLogRepository)->None:
         self._logs=logs
     
     async def execute(
@@ -26,8 +26,8 @@ class ListHttpLogsUseCase:
     )->Sequence[HttpLogRecord]:
         return await self._logs.list(filters)
     
-class GetHttpLogsUseCase:
-    def __init__(self, logs: AbstractHttpLogRepositories)->None:
+class GetHttpLogStatsUseCase:
+    def __init__(self, logs: AbstractHttpLogRepository)->None:
         self._logs=logs
 
     async def execute(self)->HttpLogStats:

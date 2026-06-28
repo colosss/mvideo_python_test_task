@@ -8,7 +8,7 @@ from src.core.domain.models import (
     ParsedHttpLog,
 )
 
-class AbstractHttpLogRepositories(ABC):
+class AbstractHttpLogRepository(ABC):
     @abstractmethod
     async def create(self, log: ParsedHttpLog)-> HttpLogRecord: ...
 

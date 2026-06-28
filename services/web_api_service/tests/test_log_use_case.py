@@ -5,9 +5,9 @@ import unittest
 from src.application.dto.logs import CreateLogDTO
 from src.application.use_case.logs import CreateHttpLogUseCase, ListHttpLogsUseCase
 from src.core.domain.models import HttpLogRecord, LogFilters,ParsedHttpLog
-from src.core.repositories import AbstractHttpLogRepositories
+from src.core.repositories import AbstractHttpLogRepository
 
-class FakeHttpLogRepository(AbstractHttpLogRepositories):
+class FakeHttpLogRepository(AbstractHttpLogRepository):
     def __init__(self)->None:
         self.records: list[HttpLogRecord]=[]
 

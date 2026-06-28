@@ -4,12 +4,12 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.domain.models import HttpLogRecord, HttpLogStats, LogFilters, ParsedHttpLog
-from src.core.repositories import AbstractHttpLogRepositories
+from src.core.repositories import AbstractHttpLogRepository
 from src.infrastructure.database.mappers import http_log_db_to_domain
 from src.application.mappers.parsed_http_log import ht
 from src.infrastructure.database.models import HttpLogModel
 
-class HttpLogRepository(AbstractHttpLogRepositories):
+class HttpLogRepository(AbstractHttpLogRepository):
     def __init__(self, session: AsyncSession)->None:
         self._sesssion=session
 
@@ -63,5 +63,5 @@ class HttpLogRepository(AbstractHttpLogRepositories):
 
         return HttpLogStats(
             method={method: count for method, count in method_result.all()},
-            status_code={str(code): count for code, count in statuses_result.all()}
+            status_code={str(code): count for code, count in statuses_result.all()},
         )
