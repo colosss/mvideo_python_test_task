@@ -99,10 +99,10 @@ docker compose down
 docker compose down -v
 ```
 
-Запустить несколько background сервисов:
+Запустить load-test (locust):
 
 ```bash
-docker compose up --build --scale background-processing-service=3
+docker compose up --build load-test
 ```
 
 ## API
@@ -201,20 +201,41 @@ Background service пишет выгруженные логи сюда:
 - background service хранит last_created, чтобы не выгружать одни и те же записи снова
 - общий файл защищен через fcntl.flock
 
-## Проверка без Docker
-
-Проверить, что код компилируется:
-
-```bash
-python -m compileall \
-  services/web_api_service/src services/web_api_service/main.py \
-  services/client_service/src services/client_service/main.py \
-  services/background_processing_service/src services/background_processing_service/main.py
+## Load-test (locust)
+```
+load-test-1  | [2026-06-29 08:39:57,293] b99dfb658444/INFO/locust.main: Starting Locust 2.44.4
+load-test-1  | [2026-06-29 08:39:57,294] b99dfb658444/INFO/locust.main: Run time limit set to 60 seconds
+load-test-1  | [2026-06-29 08:39:57,294] b99dfb658444/INFO/locust.runners: Ramping to 20 users at a rate of 5.00 per second
+load-test-1  | [2026-06-29 08:40:00,296] b99dfb658444/INFO/locust.runners: All users spawned: {"MVideoHttpLogUser": 20} (20 total users)
+load-test-1  | [2026-06-29 08:40:55,903] b99dfb658444/INFO/locust.main: --run-time limit reached, shutting down
+load-test-1  | Load test summary: requests=3855, fail_ratio=0.0000, p95_ms=87.00
+load-test-1  | [2026-06-29 08:40:55,955] b99dfb658444/INFO/locust.main: Shutting down (exit code 0)
+load-test-1  | Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+load-test-1  | --------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+load-test-1  | GET      GET /api/data                                                                   1049     0(0.00%) |      9       3     207      5 |   17.90        0.00
+load-test-1  | GET      GET /api/stats                                                                   352     0(0.00%) |      9       3     248      5 |    6.01        0.00
+load-test-1  | GET      GET /health                                                                      382     0(0.00%) |      2       1      77      2 |    6.52        0.00
+load-test-1  | POST     POST /api/data                                                                  2072     0(0.00%) |     35       8     693     17 |   35.36        0.00
+load-test-1  | --------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+load-test-1  |          Aggregated                                                                      3855     0(0.00%) |     23       1     693     12 |   65.79        0.00
+load-test-1  | 
+load-test-1  | Response time percentiles (approximated)
+load-test-1  | Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+load-test-1  | --------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+load-test-1  | GET      GET /api/data                                                                           5      6      6      6      8     13    100    130    200    210    210   1049
+load-test-1  | GET      GET /api/stats                                                                          5      6      7      7      8     13     67    140    250    250    250    352
+load-test-1  | GET      GET /health                                                                             2      2      2      2      3      8     25     29     77     77     77    382
+load-test-1  | POST     POST /api/data                                                                         17     21     25     29     67    130    280    350    580    690    690   2072
+load-test-1  | --------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+load-test-1  |          Aggregated                                                                             12     16     19     21     35     87    190    300    570    690    690   3855
+load-test-1  | 
+load-test-1 exited with code 0
 ```
 
-Запустить тесты web-api-service:
+## Locust-statistics
 
-```bash
-cd services/web_api_service
-PYTHONPATH=. python -m unittest discover -s tests
-```
+![locust statistics](./locust_data/locust_statics.png)
+
+## Locust_charts
+
+![locust charts](./locust_data/locust_charts.png)
