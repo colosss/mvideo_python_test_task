@@ -9,8 +9,8 @@ from src.infrastructure.database.base import Base
 
 class HttpLogModel(Base):
     __tablename__="http_logs"
-    __table_args__=(
-        Index("ix_http_logs_created", "created"),
+    __table_args__ = (
+        Index("ix_http_logs_created_at", "created_at"),
         Index("ix_http_logs_method", "method"),
         Index("ix_http_logs_status_code", "status_code"),
     )

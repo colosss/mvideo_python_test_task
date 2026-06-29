@@ -1,6 +1,16 @@
-def main():
-    print("Hello from web-api-service!")
+import uvicorn
 
+from src.interfaces.api.app import create_app
 
-if __name__ == "__main__":
+app=create_app()
+
+def main()->None:
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+    )
+
+if __name__=="__main__":
     main()
