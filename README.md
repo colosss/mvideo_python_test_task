@@ -2,19 +2,21 @@
 
 Это тестовое задание на Python.
 
-Проект собирает HTTP логи, сохраняет их в базу и отдельно выгружает их в файл.
+Проект принимает HTTP логи, сохраняет их в PostgreSQL, позволяет получать сохраненные данные через API и отдельно выгружает их в файл через фоновый сервис.
 
-В проекте есть 3 сервиса:
-
-- web-api-service принимает логи и сохраняет их в PostgreSQL
-- client-service генерирует логи и отправляет их в web-api-service
-- background-processing-service забирает логи из web-api-service и пишет их в файл
-
-Пример лога:
+Формат одного лога:
 
 ```text
 192.168.1.1 GET /api/users 200
 ```
+
+В проекте есть 3 основных сервиса:
+
+- web-api-service - принимает логи, проверяет их и сохраняет в PostgreSQL
+- client-service - генерирует случайные логи и отправляет их в web-api-service
+- background-processing-service - периодически забирает логи из web-api-service и сохраняет их в файл
+
+Дополнительно добавлен load-test сервис для проверки нагрузки через Locust.
 
 ## Стек
 
@@ -24,50 +26,86 @@
 - SQLAlchemy
 - asyncpg
 - PostgreSQL
+- Alembic
 - httpx
 - Docker
 - Docker Compose
+- Locust
 
 ## Архитектура
 
-Проект разделен на несколько слоев.
+Проект разделен на несколько сервисов, потому что по заданию клиент, Web API и фоновая обработка должны быть отдельными частями системы.
+
+Внутри сервисов код разделен по слоям:
 
 - core - основные модели и интерфейсы
 - application - основная логика приложения
 - infrastructure - работа с базой, файлами и HTTP клиентами
-- interfaces - API, worker и запуск сервисов
+- interfaces - API, worker и точки запуска
 - config - настройки из переменных окружения
 
-Я сделал такое разделение, чтобы логика приложения не зависела напрямую от FastAPI, SQLAlchemy и других внешних библиотек.
+Такое разделение нужно, чтобы основная логика приложения не зависела напрямую от FastAPI, SQLAlchemy, файловой системы или конкретного HTTP клиента.
 
-## Что делает проект
+## Что делает web-api-service
 
-web-api-service:
+web-api-service принимает HTTP лог через POST /api/data.
 
-- принимает POST запрос с логом
-- проверяет формат лога
-- разбирает лог на ip, method, uri и status_code
-- сохраняет данные в PostgreSQL
-- возвращает сохраненные логи через GET запрос
-- отдает статистику через отдельный endpoint
+Пример тела запроса:
 
-client-service:
+```json
+{
+  "log": "192.168.1.1 GET /api/users 200"
+}
+```
 
-- генерирует случайные HTTP логи
-- отправляет их в web-api-service
-- работает в несколько потоков
-- пишет отправленные сообщения в файл
+Сервис делает следующее:
 
-background-processing-service:
+- проверяет формат строки
+- разбирает строку на ip, method, uri и status_code
+- создает уникальный id записи
+- сохраняет время создания записи
+- сохраняет запись в PostgreSQL
+- возвращает сохраненные записи через GET /api/data
+- считает статистику через GET /api/stats
 
-- периодически делает GET запрос к web-api-service
-- получает новые логи
-- сохраняет их в файл в Docker volume
-- может запускаться в нескольких экземплярах
+Для работы с базой используется SQLAlchemy async и asyncpg.
 
-Для общего файла используется блокировка через fcntl.flock, чтобы несколько background сервисов не писали в файл одновременно.
+## Что делает client-service
 
-## Запуск
+client-service генерирует случайные HTTP логи и отправляет их в web-api-service.
+
+Он умеет:
+
+- работать в несколько потоков
+- делать случайную задержку между запросами
+- брать количество потоков и задержку из переменных окружения
+- логировать все отправленные сообщения в файл
+
+Файл с отправленными логами внутри контейнера:
+
+```text
+/var/log/client-service/sent_logs.jsonl
+```
+
+## Что делает background-processing-service
+
+background-processing-service периодически делает GET запросы к web-api-service и сохраняет полученные записи в файл.
+
+Файл с выгруженными логами внутри контейнера:
+
+```text
+/data/http_logs.jsonl
+```
+
+Сервис хранит состояние выгрузки в отдельном файле:
+
+```text
+/data/http_logs.state.json
+```
+
+Чтобы несколько экземпляров background-processing-service не писали в один файл одновременно, используется файловая блокировка через fcntl.flock.
+
+## Запуск проекта
 
 Сначала нужно создать .env файл:
 
@@ -81,10 +119,16 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Web API будет доступен здесь:
+После запуска Web API будет доступен здесь:
 
 ```text
 http://localhost:8000
+```
+
+Swagger документация:
+
+```text
+http://localhost:8000/docs
 ```
 
 Остановить проект:
@@ -99,26 +143,47 @@ docker compose down
 docker compose down -v
 ```
 
-Запустить load-test (locust):
-
-```bash
-docker compose up --build load-test
-```
-
 ## API
 
 Создать лог:
 
 ```bash
 curl -X POST http://localhost:8000/api/data \
-  -H 'Content-Type: application/json' \
+  -H "Content-Type: application/json" \
   -d '{"log":"192.168.1.1 GET /api/users 200"}'
 ```
 
-Получить логи:
+Пример успешного ответа:
+
+```json
+{
+  "id": "uuid",
+  "created": "2025-01-01T12:00:00",
+  "log": {
+    "ip": "192.168.1.1",
+    "method": "GET",
+    "uri": "/api/users",
+    "status_code": 200
+  }
+}
+```
+
+Получить сохраненные логи:
 
 ```bash
-curl 'http://localhost:8000/api/data?limit=10&order=desc'
+curl "http://localhost:8000/api/data?limit=10&order=desc"
+```
+
+Получить логи с фильтром по методу:
+
+```bash
+curl "http://localhost:8000/api/data?method=GET&limit=10"
+```
+
+Получить логи с фильтром по статусу:
+
+```bash
+curl "http://localhost:8000/api/data?status_code=200&limit=10"
 ```
 
 Получить статистику:
@@ -133,24 +198,28 @@ curl http://localhost:8000/api/stats
 {
   "methods": {
     "GET": 120,
-    "POST": 95
+    "POST": 95,
+    "PUT": 12
   },
   "status_codes": {
     "200": 210,
-    "404": 15
+    "404": 15,
+    "500": 2
   }
 }
 ```
+
+Статистика считается на стороне базы через SQL запросы с группировкой.
 
 ## Параметры GET /api/data
 
 - limit - сколько записей вернуть
 - offset - сколько записей пропустить
 - method - фильтр по HTTP методу
-- status_code - фильтр по статусу
+- status_code - фильтр по HTTP статусу
 - created_after - получить записи после указанного времени
 - created_before - получить записи до указанного времени
-- order - сортировка asc или desc
+- order - сортировка, asc или desc
 
 ## Переменные окружения
 
@@ -160,82 +229,153 @@ PostgreSQL и Web API:
 - DB_USER - пользователь базы данных
 - DB_PASSWORD - пароль базы данных
 - DB_PUBLIC_PORT - порт PostgreSQL на компьютере
-- DB_ECHO - выводить SQL запросы или нет
+- DB_ECHO - включить или выключить вывод SQL запросов
 - WEB_API_PUBLIC_PORT - порт Web API на компьютере
 
 Client service:
 
-- CLIENT_WORKERS - количество потоков
-- CLIENT_MAX_DELAY_MS - максимальная задержка между запросами
-- CLIENT_REQUESTS_PER_WORKER - количество запросов на один поток, 0 значит без лимита
+- CLIENT_WORKERS - количество потоков клиента
+- CLIENT_MAX_DELAY_MS - максимальная задержка между запросами в миллисекундах
+- CLIENT_REQUESTS_PER_WORKER - количество запросов на один поток, 0 значит без ограничения
 - CLIENT_HTTP_TIMEOUT_SECONDS - timeout для HTTP запроса
 
 Background service:
 
-- FETCH_INTERVAL_SECONDS - как часто забирать данные
-- EXPORT_BATCH_LIMIT - сколько записей забирать за один раз
+- FETCH_INTERVAL_SECONDS - как часто забирать данные из Web API
+- EXPORT_BATCH_LIMIT - сколько записей забирать за один запрос
 - BACKGROUND_HTTP_TIMEOUT_SECONDS - timeout для HTTP запроса
 
-## Файлы
+Load test:
 
-Client service пишет отправленные логи сюда:
+- LOCUST_USERS - количество виртуальных пользователей
+- LOCUST_SPAWN_RATE - скорость запуска пользователей
+- LOCUST_RUN_TIME - время выполнения теста
+- LOCUST_MAX_FAIL_RATIO - максимальный допустимый процент ошибок
+- LOCUST_MAX_P95_MS - максимальный допустимый p95 в миллисекундах
 
-```text
-/var/log/client-service/sent_logs.jsonl
+## Миграции
+
+Таблица для логов создается через Alembic при старте web-api-service.
+
+При обычном запуске через Docker Compose ничего отдельно запускать не нужно.
+
+## Load test через Locust
+
+Для проверки нагрузки добавлен отдельный сервис load-test.
+
+Запуск:
+
+```bash
+docker compose --profile load-test up --build load-test
 ```
 
-Background service пишет выгруженные логи сюда:
+Locust запускается в headless режиме, то есть без веб интерфейса. Он сам отправляет запросы в web-api-service и выводит итоговую статистику в консоль.
+
+В тесте проверяются основные endpoint'ы:
+
+- POST /api/data
+- GET /api/data
+- GET /api/stats
+- GET /health
+
+Текущий тест запускался с такими параметрами:
+
+- пользователей: 20
+- скорость запуска пользователей: 5 пользователей в секунду
+- время теста: 1 минута
+- всего запросов: 3855
+- ошибок: 0
+- общий fail ratio: 0.0000
+- общий p95: 87 ms
+- среднее время ответа по всем запросам: 23 ms
+- средняя скорость: 65.79 запросов в секунду
+
+Итоговый результат:
 
 ```text
-/data/http_logs.jsonl
+Aggregated:
+requests: 3855
+fails: 0
+fail ratio: 0.0000
+avg response time: 23 ms
+p95: 87 ms
+rps: 65.79
 ```
+
+Результаты по endpoint'ам:
+
+```text
+GET /api/data:
+requests: 1049
+fails: 0
+avg: 9 ms
+p95: 13 ms
+
+GET /api/stats:
+requests: 352
+fails: 0
+avg: 9 ms
+p95: 13 ms
+
+GET /health:
+requests: 382
+fails: 0
+avg: 2 ms
+p95: 8 ms
+
+POST /api/data:
+requests: 2072
+fails: 0
+avg: 35 ms
+p95: 130 ms
+```
+
+По результатам теста сервис отработал без ошибок. Самым тяжелым endpoint'ом ожидаемо оказался POST /api/data, потому что он парсит лог и пишет данные в PostgreSQL. GET запросы работают быстрее, а статистика считается через агрегирующие SQL запросы.
+
+В репозитории также сохранены скриншоты Locust:
+
+- locust statistics
+- locust charts
+
+Они нужны, чтобы результат нагрузки можно было посмотреть не только по выводу в консоль, но и визуально.
 
 ## Решения и допущения
 
-- таблица http_logs создается миграцией Alembic при старте контейнера web-api-service
-- при локальном запуске без Docker приложение также может создать таблицу автоматически
+- все сервисы запускаются через docker compose
+- настройки вынесены в переменные окружения
+- Web API сделан асинхронным на FastAPI
+- PostgreSQL используется как основное хранилище логов
+- каждая запись получает uuid и created timestamp
 - лог должен состоять из ip, method, uri и status_code
 - uri должен начинаться с /
-- status_code должен быть от 100 до 599
-- статистика считается через SQL запросы с группировкой
-- background service хранит last_created, чтобы не выгружать одни и те же записи снова
-- общий файл защищен через fcntl.flock
+- status_code должен быть в диапазоне от 100 до 599
+- GET /api/data поддерживает пагинацию, сортировку и фильтры
+- GET /api/stats сделан как дополнительное задание
+- статистика считается через SQL GROUP BY, а не в Python
+- background-processing-service хранит состояние последней выгрузки
+- общий файл выгрузки защищен файловой блокировкой
+- client-service пишет все отправленные сообщения в jsonl файл
+- load-test добавлен отдельно и не мешает обычному запуску проекта
 
-## Load-test (locust)
-```
-load-test-1  | [2026-06-29 08:39:57,293] b99dfb658444/INFO/locust.main: Starting Locust 2.44.4
-load-test-1  | [2026-06-29 08:39:57,294] b99dfb658444/INFO/locust.main: Run time limit set to 60 seconds
-load-test-1  | [2026-06-29 08:39:57,294] b99dfb658444/INFO/locust.runners: Ramping to 20 users at a rate of 5.00 per second
-load-test-1  | [2026-06-29 08:40:00,296] b99dfb658444/INFO/locust.runners: All users spawned: {"MVideoHttpLogUser": 20} (20 total users)
-load-test-1  | [2026-06-29 08:40:55,903] b99dfb658444/INFO/locust.main: --run-time limit reached, shutting down
-load-test-1  | Load test summary: requests=3855, fail_ratio=0.0000, p95_ms=87.00
-load-test-1  | [2026-06-29 08:40:55,955] b99dfb658444/INFO/locust.main: Shutting down (exit code 0)
-load-test-1  | Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
-load-test-1  | --------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
-load-test-1  | GET      GET /api/data                                                                   1049     0(0.00%) |      9       3     207      5 |   17.90        0.00
-load-test-1  | GET      GET /api/stats                                                                   352     0(0.00%) |      9       3     248      5 |    6.01        0.00
-load-test-1  | GET      GET /health                                                                      382     0(0.00%) |      2       1      77      2 |    6.52        0.00
-load-test-1  | POST     POST /api/data                                                                  2072     0(0.00%) |     35       8     693     17 |   35.36        0.00
-load-test-1  | --------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
-load-test-1  |          Aggregated                                                                      3855     0(0.00%) |     23       1     693     12 |   65.79        0.00
-load-test-1  | 
-load-test-1  | Response time percentiles (approximated)
-load-test-1  | Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
-load-test-1  | --------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
-load-test-1  | GET      GET /api/data                                                                           5      6      6      6      8     13    100    130    200    210    210   1049
-load-test-1  | GET      GET /api/stats                                                                          5      6      7      7      8     13     67    140    250    250    250    352
-load-test-1  | GET      GET /health                                                                             2      2      2      2      3      8     25     29     77     77     77    382
-load-test-1  | POST     POST /api/data                                                                         17     21     25     29     67    130    280    350    580    690    690   2072
-load-test-1  | --------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
-load-test-1  |          Aggregated                                                                             12     16     19     21     35     87    190    300    570    690    690   3855
-load-test-1  | 
-load-test-1 exited with code 0
+## Структура проекта
+
+```text
+.
+├── docker-compose.yml
+├── .env.example
+├── README.md
+├── load_tests
+├── locust_data
+└── services
+    ├── web_api_service
+    ├── client_service
+    └── background_processing_service
 ```
 
-## Locust-statistics
+## Пример Locust-statistics
 
 ![locust statistics](./locust_data/locust_statics.png)
 
-## Locust_charts
+## Пример Locust_charts
 
 ![locust charts](./locust_data/locust_charts.png)
