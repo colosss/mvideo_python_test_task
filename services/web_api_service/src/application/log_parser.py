@@ -20,7 +20,7 @@ def parse_http_log_line(raw_log: str)->ParsedHttpLog:
 
     if len(parts)!=4:
         raise InvalidLogFormatError(
-            "Expected format: '{IP address} {HTTP method} {UTI} {HTTP status code}"
+            "Expected format: '{IP address} {HTTP method} {URI} {HTTP status code}'"
         )
     raw_ip, method, uri, raw_status_code=parts
 

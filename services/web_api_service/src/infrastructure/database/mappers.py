@@ -3,6 +3,7 @@ from src.infrastructure.database.models import HttpLogModel
 
 def http_log_db_to_domain(log: HttpLogModel)-> HttpLogRecord:
     return HttpLogRecord(
+        id=log.id,
         ip=log.ip,
         created_at=log.created_at,
         method=log.method,

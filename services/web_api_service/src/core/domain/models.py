@@ -23,15 +23,15 @@ class HttpLogRecord:
 
 @dataclass(frozen=True)
 class HttpLogStats:
-    method: dict[str, int]
-    status_code: dict[str, int]
+    methods: dict[str, int]
+    status_codes: dict[str, int]
 
 @dataclass(frozen=True)
 class LogFilters:
     limit: int=100
     offset: int=0
     method: str|None=None
-    status_code: str|None=None
+    status_codes: str|None=None
     created_after: datetime|None=None
     created_before: datetime|None=None
     order: Literal["asc", "desc"]="desc"

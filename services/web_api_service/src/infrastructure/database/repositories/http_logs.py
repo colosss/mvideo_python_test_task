@@ -6,17 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.domain.models import HttpLogRecord, HttpLogStats, LogFilters, ParsedHttpLog
 from src.core.repositories import AbstractHttpLogRepository
 from src.infrastructure.database.mappers import http_log_db_to_domain
-from src.application.mappers.parsed_http_log import ht
 from src.infrastructure.database.models import HttpLogModel
 
 class HttpLogRepository(AbstractHttpLogRepository):
     def __init__(self, session: AsyncSession)->None:
-        self._sesssion=session
+        self._session=session
 
-    async def create(self, log):
+    async def create(self, log: ParsedHttpLog):
         db_log=HttpLogModel(
             ip=log.ip,
             method=log.method,
+            uri=log.uri,
             status_code=log.status_code,
             raw_log=log.raw_log,
         )
@@ -62,6 +62,6 @@ class HttpLogRepository(AbstractHttpLogRepository):
         )
 
         return HttpLogStats(
-            method={method: count for method, count in method_result.all()},
-            status_code={str(code): count for code, count in statuses_result.all()},
+            methods={method: count for method, count in method_result.all()},
+            status_codes={str(code): count for code, count in statuses_result.all()},
         )

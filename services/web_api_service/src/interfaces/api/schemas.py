@@ -20,12 +20,12 @@ class LogPayloadSchema(BaseModel):
 
 class HttpLogRecordSchema(BaseModel):
     id: UUID
-    created_at: datetime
+    created: datetime
     log: LogPayloadSchema
 
 class StatsSchema(BaseModel):
-    method: dict[str, int]
-    status_code: dict[str, int]
+    methods: dict[str, int]
+    status_codes: dict[str, int]
 
 class ErrorResponse(BaseModel):
     detail: dict[str, dict[str, str]]
@@ -35,7 +35,7 @@ OrderQuery=Literal["asc", "desc"]
 def http_log_record_to_schema(record: HttpLogRecord)->HttpLogRecordSchema:
     return HttpLogRecordSchema(
         id=record.id,
-        created_at=record.created_at,
+        created=record.created_at,
         log=LogPayloadSchema(
             ip=record.ip,
             method=record.method,

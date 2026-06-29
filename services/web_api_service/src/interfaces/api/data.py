@@ -72,7 +72,7 @@ async def list_logs(
             detail={
                 "error": {
                     "code": "INVALID_QUERY",
-                    "message": "Uncknown HTTP method filter",
+                    "message": "Unknown HTTP method filter",
                 }
             },
         )
