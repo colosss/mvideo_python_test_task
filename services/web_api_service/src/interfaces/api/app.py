@@ -9,7 +9,6 @@ from src.interfaces.api.constants import SERVICE_NAME
 
 @asynccontextmanager
 async def lifespan(app: FastAPI)->AsyncIterator[None]:
-    await db_helper.create_tables()
     yield
     await db_helper.dispose()
 

@@ -81,6 +81,7 @@ services:
 
   load-test:
     image: locustio/locust:latest
+    restart: "no"
     profiles:
       - load-test
     working_dir: /mnt/locust
