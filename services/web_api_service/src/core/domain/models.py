@@ -31,7 +31,7 @@ class LogFilters:
     limit: int=100
     offset: int=0
     method: str|None=None
-    status_codes: str|None=None
+    status_code: int|None=None
     created_after: datetime|None=None
     created_before: datetime|None=None
     order: Literal["asc", "desc"]="desc"

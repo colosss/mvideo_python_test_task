@@ -53,7 +53,7 @@ def run_background_service(settings: Settings)->None:
             except Exception:
                 logger.exception("Background export iteration failed")
 
-            stop_event.wait(settings.FETCH_INTERVAL_SECOND)
+            stop_event.wait(settings.FETCH_INTERVAL_SECONDS)
 
     finally:
         reader.close()

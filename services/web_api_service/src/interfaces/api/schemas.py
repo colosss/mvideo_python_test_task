@@ -45,4 +45,4 @@ def http_log_record_to_schema(record: HttpLogRecord)->HttpLogRecordSchema:
     )
 
 def stats_to_schema(stats: HttpLogStats)->StatsSchema:
-    return StatsSchema(method=stats.method, status_code=stats.status_code)
+    return StatsSchema(methods=stats.methods, status_codes=stats.status_codes)

@@ -12,7 +12,7 @@ class HttpLogRepository(AbstractHttpLogRepository):
     def __init__(self, session: AsyncSession)->None:
         self._session=session
 
-    async def create(self, log: ParsedHttpLog):
+    async def create(self, log: ParsedHttpLog)->HttpLogRecord:
         db_log=HttpLogModel(
             ip=log.ip,
             method=log.method,
@@ -20,13 +20,13 @@ class HttpLogRepository(AbstractHttpLogRepository):
             status_code=log.status_code,
             raw_log=log.raw_log,
         )
-        self._sesssion.add(db_log)
+        self._session.add(db_log)
         try:
-            await self._sesssion.commit()
+            await self._session.commit()
         except Exception:
-            await self._sesssion.rollback()
+            await self._session.rollback()
             raise
-        await self._sesssion.refresh(db_log)
+        await self._session.refresh(db_log)
         return http_log_db_to_domain(db_log)
     
     async def list(self, filters: LogFilters)->Sequence[HttpLogRecord]:
@@ -46,16 +46,16 @@ class HttpLogRepository(AbstractHttpLogRepository):
             order_column=HttpLogModel.created_at.desc()
 
         query=query.order_by(order_column).limit(filters.limit).offset(filters.offset)
-        result=await self._sesssion.execute(query)
+        result=await self._session.execute(query)
         return [http_log_db_to_domain(row) for row in result.scalars().all()]
     
     async def stats(self)->HttpLogStats:
-        method_result=await self._sesssion.execute(
+        method_result=await self._session.execute(
             select(HttpLogModel.method, func.count(HttpLogModel.id)).group_by(
                 HttpLogModel.method
             )
         )
-        statuses_result=await self._sesssion.execute(
+        statuses_result=await self._session.execute(
             select(HttpLogModel.status_code, func.count(HttpLogModel.id)).group_by(
                 HttpLogModel.status_code
             )
