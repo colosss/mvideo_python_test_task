@@ -6,7 +6,7 @@ from typing import Iterator
 from src.application.ports import ExportLock
 
 class FcntlExportLock(ExportLock):
-    def __int__(self, path: str)->None:
+    def __init__(self, path: str)->None:
         self._path=Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -18,4 +18,3 @@ class FcntlExportLock(ExportLock):
                 yield
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-                

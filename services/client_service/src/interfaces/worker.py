@@ -46,7 +46,7 @@ def run_client_service(settings: Settings)->None:
                 use_case.execute(
                     worker_id=worker_id,
                     stop_event=stop_event,
-                    requests_limit=settings.CLIENT_REQUEST_PER_WORKER,
+                    requests_limit=settings.CLIENT_REQUESTS_PER_WORKER,
                 )
             finally:
                 sender.close()

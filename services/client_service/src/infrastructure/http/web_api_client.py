@@ -17,7 +17,7 @@ class HttpxWebApiLogSender(LogSender):
         except httpx.HttpError as exc:
             return SendResult(ok=False, error=str(exc))
         
-        if 200<=response.statuse_code<300:
+        if 200<=response.status_code<300:
             return SendResult(ok=True, status_code=response.status_code)
         
         return SendResult(

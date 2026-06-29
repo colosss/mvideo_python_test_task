@@ -15,7 +15,7 @@ class HttpxWebApiLogReader(RemoteLogReader):
         *, 
         created_after:str|None, 
         limit: int,
-    )->Sequence{RemoteHttpLogRecord}:
+    )->Sequence[RemoteHttpLogRecord]:
         params:dict[str, Any]={"limit": limit, "order": "asc"}
         if created_after:
             params["created_after"]=created_after

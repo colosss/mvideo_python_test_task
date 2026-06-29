@@ -9,7 +9,7 @@ from src.infrastructure.file.jsonl_export import JsonlExportWriter
 from src.infrastructure.file.state_store import JsonExportStateStore
 from src.infrastructure.http.web_api_client import HttpxWebApiLogReader
 
-logger=logging.getLoggeer(__name__)
+logger=logging.getLogger(__name__)
 
 def _install_signal_handlers(stop_event: threading.Event)->None:
     def handler(signum: int, frame: object)->None:
@@ -34,7 +34,7 @@ def run_background_service(settings: Settings)->None:
     )
     use_case=FetchAndPersistLogsUseCase(
         reader=reader,
-        writer=JsonExportStateStore(settings.EXPORT_FILE_PATH),
+        writer=JsonlExportWriter(settings.EXPORT_FILE_PATH),
         state_store=JsonExportStateStore(settings.EXPORT_STATE_PATH),
         export_lock=FcntlExportLock(settings.EXPORT_LOCK_PATH),
         batch_limit=settings.EXPORT_BATCH_LIMIT,
@@ -42,7 +42,7 @@ def run_background_service(settings: Settings)->None:
 
     logger.info(
         "Background exporter started: interval=%ss file=%s",
-        settings.FETCH_INTERVAL_SECOND,
+        settings.FETCH_INTERVAL_SECONDS,
         settings.EXPORT_FILE_PATH,
     )
     try:

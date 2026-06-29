@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     )
 
     WEB_API_BASE_URL: str = "http://localhost:8000"
-    FETCH_INTERVAL_SECOND: float=Field(default=10.0, gt=0)
+    FETCH_INTERVAL_SECONDS: float=Field(default=10.0, gt=0)
     EXPORT_BATCH_LIMIT: int=Field(default=500, ge=1, le=1000)
     EXPORT_FILE_PATH: str="/data/http_logs.jsonl"
     EXPORT_STATE_PATH: str="/data/http_logs.state.json"
