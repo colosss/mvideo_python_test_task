@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mvideo_logs}
+      POSTGRES_USER: ${DB_USER:-mvideo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mvideo}
+    ports:
+      - "${DB_PUBLIC_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web-api-service:
+    build:
+      context: ./services/web_api_service
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-mvideo}
+      DB_PASSWORD: ${DB_PASSWORD:-mvideo}
+      DB_NAME: ${DB_NAME:-mvideo_logs}
+      DB_ECHO: ${DB_ECHO:-false}
+    ports:
+      - "${WEB_API_PUBLIC_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  client-service:
+    build:
+      context: ./services/client_service
+    restart: on-failure
+    environment:
+      WEB_API_BASE_URL: http://web-api-service:8000
+      CLIENT_WORKERS: ${CLIENT_WORKERS:-4}
+      CLIENT_MAX_DELAY_MS: ${CLIENT_MAX_DELAY_MS:-1000}
+      CLIENT_REQUESTS_PER_WORKER: ${CLIENT_REQUESTS_PER_WORKER:-0}
+      CLIENT_LOG_FILE: /var/log/client-service/sent_logs.jsonl
+      CLIENT_HTTP_TIMEOUT_SECONDS: ${CLIENT_HTTP_TIMEOUT_SECONDS:-5}
+    volumes:
+      - client_logs:/var/log/client-service
+    depends_on:
+      web-api-service:
+        condition: service_healthy
+
+  background-processing-service:
+    build:
+      context: ./services/background_processing_service
+    restart: unless-stopped
+    environment:
+      WEB_API_BASE_URL: http://web-api-service:8000
+      FETCH_INTERVAL_SECONDS: ${FETCH_INTERVAL_SECONDS:-10}
+      EXPORT_BATCH_LIMIT: ${EXPORT_BATCH_LIMIT:-500}
+      EXPORT_FILE_PATH: /data/http_logs.jsonl
+      EXPORT_STATE_PATH: /data/http_logs.state.json
+      EXPORT_LOCK_PATH: /data/http_logs.lock
+      BACKGROUND_HTTP_TIMEOUT_SECONDS: ${BACKGROUND_HTTP_TIMEOUT_SECONDS:-10}
+    volumes:
+      - exported_logs:/data
+    depends_on:
+      web-api-service:
+        condition: service_healthy
+
+  load-test:
+    image: locustio/locust:latest
+    profiles:
+      - load-test
+    working_dir: /mnt/locust
+    command:
+      - -f
+      - /mnt/locust/locustfile.py
+      - --headless
+      - --host
+      - http://web-api-service:8000
+      - --users
+      - ${LOCUST_USERS:-20}
+      - --spawn-rate
+      - ${LOCUST_SPAWN_RATE:-5}
+      - --run-time
+      - ${LOCUST_RUN_TIME:-1m}
+      - --only-summary
+    environment:
+      LOCUST_HOST: http://web-api-service:8000
+      LOCUST_USERS: ${LOCUST_USERS:-20}
+      LOCUST_SPAWN_RATE: ${LOCUST_SPAWN_RATE:-5}
+      LOCUST_RUN_TIME: ${LOCUST_RUN_TIME:-1m}
+      LOCUST_MAX_FAIL_RATIO: ${LOCUST_MAX_FAIL_RATIO:-0.02}
+      LOCUST_MAX_P95_MS: ${LOCUST_MAX_P95_MS:-1000}
+    volumes:
+      - ./load_tests:/mnt/locust:ro
+    depends_on:
+      web-api-service:
+        condition: service_healthy
+      background-processing-service:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  client_logs:
+  exported_logs:
