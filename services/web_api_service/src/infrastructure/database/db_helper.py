@@ -17,12 +17,6 @@ class DataBaseHelper:
     async def session_dependency(self)->AsyncIterator[AsyncSession]:
         async with self.session_factory() as session:
             yield session
-        
-    async def create_tables(self)->None:
-        from src.infrastructure.database.base import Base
-
-        async with self.engine.begin() as connection:
-            await connection.run_sync(Base.metadata.create_all)
 
     async def dispose(self)->None:
         await self.engine.dispose()
